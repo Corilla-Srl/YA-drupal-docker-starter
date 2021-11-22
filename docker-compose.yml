@@ -18,7 +18,7 @@ services:
       UPLOAD_LIMIT: 1G
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.pma.rule=Host(`pma.localhost`)"
+      - "traefik.http.routers.pma.rule=Host(`pma.${COMPOSE_PROJECT_NAME}.localhost`)"
       - "traefik.http.routers.pma.entrypoints=web"
   traefik:
     image: "traefik:v2.5"
@@ -38,7 +38,7 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
   php:
-    build: ./drupal-starter
+    image: ggggino/drupal-starter:0.1
     container_name: "${COMPOSE_PROJECT_NAME}_php"
     restart: unless-stopped
     volumes:
@@ -57,5 +57,5 @@ services:
       - ./docroot:/var/www/html:cached
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.aeroclub.rule=Host(`aeroclub.localhost`)"
+      - "traefik.http.routers.aeroclub.rule=Host(`${COMPOSE_PROJECT_NAME}.localhost`)"
       - "traefik.http.routers.aeroclub.entrypoints=web"

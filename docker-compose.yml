@@ -1,0 +1,61 @@
+version: '3.1'
+services:
+  db:
+    image: 'mysql:5.7'
+    container_name: "${COMPOSE_PROJECT_NAME}_db"
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+  pma:
+    image: phpmyadmin/phpmyadmin
+    container_name: "${COMPOSE_PROJECT_NAME}_pma"
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: root
+      PHP_UPLOAD_MAX_FILESIZE: 1G
+      PHP_MAX_INPUT_VARS: 1G
+      UPLOAD_LIMIT: 1G
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pma.rule=Host(`pma.localhost`)"
+      - "traefik.http.routers.pma.entrypoints=web"
+  traefik:
+    image: "traefik:v2.5"
+    container_name: "${COMPOSE_PROJECT_NAME}_traefik"
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+    ports:
+      - "8080:8080"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+  php:
+    build: ./drupal-starter
+    container_name: "${COMPOSE_PROJECT_NAME}_php"
+    restart: unless-stopped
+    volumes:
+      - './docroot:/var/www/html'
+  apache:
+    image: wodby/apache
+    container_name: "${COMPOSE_PROJECT_NAME}_apache"
+    depends_on:
+      - php
+    environment:
+      APACHE_LOG_LEVEL: debug
+      APACHE_BACKEND_HOST: php
+      APACHE_VHOST_PRESET: php
+      APACHE_DOCUMENT_ROOT: /var/www/html/web
+    volumes:
+      - ./docroot:/var/www/html:cached
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.aeroclub.rule=Host(`aeroclub.localhost`)"
+      - "traefik.http.routers.aeroclub.entrypoints=web"

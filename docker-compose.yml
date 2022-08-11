@@ -2,13 +2,15 @@ version: '3.1'
 services:
   db:
     image: 'mysql:5.7'
-    container_name: "${COMPOSE_PROJECT_NAME}_db"
+    container_name: '${COMPOSE_PROJECT_NAME}_db'
     restart: unless-stopped
+    volumes:
+      - './docker-runtime/mysql:/var/lib/mysql'
     environment:
       MYSQL_ROOT_PASSWORD: root
   pma:
     image: phpmyadmin/phpmyadmin
-    container_name: "${COMPOSE_PROJECT_NAME}_pma"
+    container_name: '${COMPOSE_PROJECT_NAME}_pma'
     environment:
       PMA_HOST: db
       PMA_USER: root
@@ -17,35 +19,54 @@ services:
       PHP_MAX_INPUT_VARS: 1G
       UPLOAD_LIMIT: 1G
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.pma.rule=Host(`pma.${COMPOSE_PROJECT_NAME}.localhost`)"
-      - "traefik.http.routers.pma.entrypoints=web"
+      - traefik.enable=true
+      - traefik.http.routers.pma.rule=Host(`pma.localhost`)
+      - traefik.http.routers.pma.entrypoints=web
   traefik:
-    image: "traefik:v2.5"
-    container_name: "${COMPOSE_PROJECT_NAME}_traefik"
+    image: 'traefik:v2.6'
+    container_name: '${COMPOSE_PROJECT_NAME}_traefik'
     command:
-      #- "--log.level=DEBUG"
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - '--api.insecure=true'
+      - '--providers.docker=true'
+      - '--providers.docker.exposedbydefault=false'
+      - '--entrypoints.web.address=:80'
+      - '--entrypoints.websecure.address=:443'
+      - '--entrypoints.mailhog.address=:8025'
+      - '--certificatesresolvers.myresolver.acme.tlschallenge=true'
     ports:
-      - "8080:8080"
-      - "80:80"
-      - "443:443"
+      - '8080:8080'
+      - '80:80'
+      - '443:443'
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
   php:
-    image: ggggino/drupal-starter:0.1
-    container_name: "${COMPOSE_PROJECT_NAME}_php"
+    image: 'ggggino/drupal-starter:0.2'
+    container_name: '${COMPOSE_PROJECT_NAME}_drupal'
     restart: unless-stopped
+    environment:
+      PHP_SENDMAIL_PATH: '/usr/sbin/sendmail -t -i -S mailhog:1025'
+      PHP_FPM_CLEAR_ENV: 'yes'
+      PHP_XDEBUG: 'true'
+      PHP_XDEBUG_CLIENT_HOST: 192.168.65.128
+      DB_HOST: db
+      DB_USER: drupal
+      DB_PASSWORD: drupal
+      DB_NAME: drupal
+      DB_DRIVER: mysql
     volumes:
       - './docroot:/var/www/html'
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - '8025:8025'
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mailhog.rule=Host(`mailhog.localhost`)
+      - traefik.http.routers.mailhog.entrypoints=web
+      - traefik.http.services.mailhog.loadbalancer.server.port=8025
   apache:
-    image: wodby/apache
-    container_name: "${COMPOSE_PROJECT_NAME}_apache"
+    image: 'wodby/apache:2.4-4.0.3'
+    container_name: '${COMPOSE_PROJECT_NAME}_apache'
     depends_on:
       - php
     environment:
@@ -54,8 +75,8 @@ services:
       APACHE_VHOST_PRESET: php
       APACHE_DOCUMENT_ROOT: /var/www/html/web
     volumes:
-      - ./docroot:/var/www/html:cached
+      - './docroot:/var/www/html'
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.aeroclub.rule=Host(`${COMPOSE_PROJECT_NAME}.localhost`)"
-      - "traefik.http.routers.aeroclub.entrypoints=web"
+      - traefik.enable=true
+      - traefik.http.routers.aeroclub.rule=Host(`aeroclub.localhost`)
+      - traefik.http.routers.aeroclub.entrypoints=web
